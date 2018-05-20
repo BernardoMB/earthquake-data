@@ -1,0 +1,140 @@
+---
+title: "Terremotos"
+author: "Bernardo Mondragon Brozon"
+date: "19/5/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Install and load all packages
+
+# Functions for Extreme Value Distributions
+# https://cran.r-project.org/web/packages/evd/index.html
+install.packages("evd")
+library(evd)
+
+# Econometric Tools for Performance and Risk Analysis
+# https://cran.r-project.org/web/packages/PerformanceAnalytics/PerformanceAnalytics.pdf
+install.packages("PerformanceAnalytics")
+library(PerformanceAnalytics)
+
+# Extreme values in R
+# ftp://cran.r-project.org/pub/R/web/packages/evir/evir.pdf
+install.packages("evir")
+library(evir)
+
+# Modelling Extreme Events in Finance
+# ftp://cran.r-project.org/pub/R/web/packages/fExtremes/fExtremes.pdf
+install.packages("fExtremes")
+library(fExtremes)
+
+# Create Elegant Data Visualisations Using the Grammar of Graphics
+# https://cran.r-project.org/web/packages/ggplot2/ggplot2.pdf
+install.packages("ggplot2")
+library(ggplot2)
+
+install.packages("POT")
+library(POT)
+
+install.packages("PtProcess")
+library(PtProcess)
+
+install.packages('copula')
+library('copula')
+
+install.packages('Kendall')
+library('Kendall')
+
+# Para poner tablas
+#install.packages("knitr")
+library(knitr)
+
+```
+
+\section{Los datos}
+
+Se tiene informacion acerca de la fecha y la magnitud de terremotos que han ocurrido desde $1950$ hasta el año $2015$. Los datos tienen el siguiente aspecto:
+
+```{r data, echo=FALSE, warning=FALSE}
+# Read data
+data <-read.csv("terremotos.csv")
+
+# Change data frame names
+names(data) <- c("time","magnitude")
+
+kable(head(data, 10))
+```
+
+Con los datos obtenidos se puede observar la siguiente serie de tiempo
+```{r seria de tiempo, echo=FALSE}
+# Grafica de analidis exploratorio de data (Serie de tiempo)
+barplot(data$magnitude,xlab="Terremotos en Orden Cronologico\n1950-2015",ylab="Magnitud", main="Serie de tiempo")
+```
+
+Podemos suponer independecia y que no efectos estacionarios.
+
+\section{seleccion del modelo}
+
+El histograma es el siguiente:
+
+```{r histograma, echo=FALSE}
+#Histograma en log
+hist(log(data$magnitude),breaks=30,xlab="Magnitud en escala logaritmica",ylab="Frecuencia",main="Histograma")
+```
+
+Con base en esto se obtiene la siguiente densidad:
+
+```{r densidad, echo=FALSE}
+plot(density(log(data$magnitude)),main="Densidad de la magnitud")
+```
+
+Pareciera que la magnitud en escala logarimica se le puede ajustar una distribucion exponencial:
+
+```{r qqplot, echo=FALSE}
+#QQ plot exponencial vs data
+qqplot(data$magnitude ,rexp(2000,1), main="QQ plot",ylab="Exponencial",xlab="magnitude del terremoto")
+abline(0,.15)
+```
+
+La distribucion empirica de la magnitud en escala logaritmica es la siguiente:
+```{r qqplot, echo=FALSE}
+#Distribuci?n empirica
+ECDF<- ecdf(data$magnitude)
+plot(ECDF,main="Distribucion empirica de la magnitud")
+```
+
+Si se observara que la media en exceso es creciente, entonces se podría pensar que los datos de las magnitudes en escala logarimica provienen de una distribucion de cola pesada:
+```{r media en exceso, }
+#Medias en exceso
+meplot(data$magnitude,main="Media en exceso")
+```
+
+\section{Terremotos de escala 8.0}
+
+Si unicamente es de interes la ocurrencia de terremotos superiores a $8.0$ de magnitud, entonces la informacion tendria el siguiente aspecto:
+
+```{r magnitud 8.0 solo}
+terremotos8 <- subset(data, magnitude >= 8)
+kable(head(terremotos8, 10))
+```
+
+En este estudio se tomaran en cuenta terremotos que, en escala Richter, tengan una magnitud igual o superior a $8.0$ y, dada la naturaleza de los terremotos (eventos raros), se asumirá que la frecuencia de estos eventos siguen un proceso de Poisson. 
+
+<!-- En estadistica, un error de prediccion es la diferencia entre el valor observado y el valor predicho de una serie de tiempo. En casos sencillos, en cada punto del tiempo, el valor pronosticado es comparado con el verdadero valor arrojado por el proceso y de esta manera se construye una coleccion de errores de prediccion. Se pueden usar las diferencias entre el valor pronosticado y el valor real observado o se pueden usar los errores proporcionales que indican cuán erroneo fue el pronóstico.   -->
+
+Despues se contruirá una serie de tiempo discreta basada en las tasa de recurrencia empirica (ERRs: empirical recurrent rates) del proceso de Poisson asumido y calculadas secuancialmente a tiempos equidistantes durante el periodo de observacion. La seria de tiempo de estas tasas, mejor conocida como la huella del modelo, hará posible desarrollar modelos con la informacion de los terremotos.
+
+El objetivo principal, por ahora, será convertir el proceso de Poisson asumido en una serie de tiempo de las tasas de recurrencia empirica. 
+
+\subsection{Tasas de recurrencia empirica}
+
+Sea $t_1,\dots,t_N$ el tiempo de ocurrencia de los $N$ terremotods ordenados durante un periodo de observacion $(t_0,0)$. Si $h$ es el tamaño de los intervalos de tiempo, entonces $\{z_l\}$, una serie de tiempo discreta generada secuencialmente a intervalos de tiempo equidistantes $t_0+h, t_0+2h, \dots,t_0+Nh$ puede ser descrita como las observaciones en los tiempos $t_l=t_0+lh$ con $l=1,\dots,N$.
+
+La serie de tiempo basadas en las tasas de recurrencia empirica es generada del siguiente modo:
+
+$$z_l=\frac{n_l}{lh}=\frac{\mbox{numero total de observaciones en } (t_0,t_0+lh)}{lh}, \quad l=1,2,\dots,N.$$
+
+Hay que notar que $z_l$ evoluciona conforme pasa el tiempo y es simplemente el estimador de maxima verocimilitud de la tasa media de recurrencia si el proceso asumido en el periodo $(t_0,t_l)$ es un proceso de Poisson homogeneo. 
+
